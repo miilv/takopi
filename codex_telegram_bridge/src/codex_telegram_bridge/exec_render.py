@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import deque
 from dataclasses import dataclass, field
 from textwrap import indent
@@ -52,12 +53,16 @@ def _shorten(text: str, max_len: int = 140) -> str:
 class ExecRenderState:
     items: dict[str, dict[str, Any]] = field(default_factory=dict)
     recent: deque[str] = field(default_factory=lambda: deque(maxlen=4))
+    last_turn: Optional[int] = None
 
 
 def _record_item(state: ExecRenderState, item: dict[str, Any]) -> None:
     item_id = item.get("id")
     if isinstance(item_id, str) and item_id:
         state.items[item_id] = item
+        match = re.search(r"item_(\d+)", item_id)
+        if match:
+            state.last_turn = int(match.group(1))
 
 
 def render_event_cli(
@@ -282,6 +287,11 @@ class ExecProgressRenderer:
         return line
 
     def render(self, header: str) -> str:
-        if not self.state.recent:
+        lines: list[str] = []
+        if self.state.last_turn is not None:
+            lines.append(f"Turn: {self.state.last_turn}")
+        if self.state.recent:
+            lines.extend(self.state.recent)
+        if not lines:
             return header
-        return header + "\n\n" + "\n".join(f"- {line}" for line in self.state.recent)
+        return header + "\n\n" + "\n".join(lines)
