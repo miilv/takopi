@@ -365,9 +365,8 @@ def run(
     token = config["bot_token"]
     config_chat_id = int(config["chat_id"])
 
-    startup_msg = config.get("startup_message", "✅ exec_bridge started (codex exec).")
     startup_pwd = os.getcwd()
-    startup_msg = f"{startup_msg}\nPWD: {startup_pwd}"
+    startup_msg = f"codex exec bridge has started\npwd: {startup_pwd}"
 
     codex_cmd = config.get("codex_cmd", "codex")
     workspace = workdir if workdir is not None else config.get("codex_workspace")
