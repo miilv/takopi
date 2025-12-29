@@ -17,15 +17,12 @@ _EXAMPLE_CONFIG = (
 
 
 def _display_path(path: Path) -> str:
-    try:
-        cwd = Path.cwd()
-        if path.is_relative_to(cwd):
-            return f"./{path.relative_to(cwd).as_posix()}"
-        home = Path.home()
-        if path.is_relative_to(home):
-            return f"~/{path.relative_to(home).as_posix()}"
-    except Exception:
-        return str(path)
+    cwd = Path.cwd()
+    if path.is_relative_to(cwd):
+        return f"./{path.relative_to(cwd).as_posix()}"
+    home = Path.home()
+    if path.is_relative_to(home):
+        return f"~/{path.relative_to(home).as_posix()}"
     return str(path)
 
 
