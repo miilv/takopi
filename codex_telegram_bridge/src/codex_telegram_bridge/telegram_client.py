@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-import requests
+import logging
+from typing import Any
+
+import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramClient:
@@ -12,42 +17,46 @@ class TelegramClient:
         if not token:
             raise ValueError("Telegram token is empty")
         self._base = f"https://api.telegram.org/bot{token}"
-        self._timeout_s = timeout_s
+        self._client = httpx.AsyncClient(timeout=timeout_s)
 
-    def _call(self, method: str, params: dict) -> object:
-        resp = requests.post(
-            f"{self._base}/{method}",
-            json=params,
-            timeout=self._timeout_s,
-        )
-        resp.raise_for_status()
-        payload = resp.json()
-        if not payload.get("ok"):
-            raise RuntimeError(f"Telegram API error: {payload}")
-        return payload["result"]
+    async def close(self) -> None:
+        await self._client.aclose()
 
-    def get_updates(
+    async def _post(self, method: str, json_data: dict[str, Any]) -> Any:
+        try:
+            resp = await self._client.post(f"{self._base}/{method}", json=json_data)
+            resp.raise_for_status()
+            payload = resp.json()
+            if not payload.get("ok"):
+                raise RuntimeError(f"Telegram API error: {payload}")
+            return payload["result"]
+        except httpx.HTTPError as e:
+            logger.error("Telegram network error: %s", e)
+            raise
+
+    async def get_updates(
         self,
         offset: int | None,
         timeout_s: int = 50,
         allowed_updates: list[str] | None = None,
     ) -> list[dict]:
-        params: dict = {"timeout": timeout_s}
+        params: dict[str, Any] = {"timeout": timeout_s}
         if offset is not None:
             params["offset"] = offset
         if allowed_updates is not None:
             params["allowed_updates"] = allowed_updates
-        return self._call("getUpdates", params)  # type: ignore[return-value]
+        return await self._post("getUpdates", params)  # type: ignore[return-value]
 
-    def send_message(
+    async def send_message(
         self,
         chat_id: int,
         text: str,
         reply_to_message_id: int | None = None,
         disable_notification: bool | None = False,
         entities: list[dict] | None = None,
+        parse_mode: str | None = None,
     ) -> dict:
-        params: dict = {
+        params: dict[str, Any] = {
             "chat_id": chat_id,
             "text": text,
         }
@@ -57,26 +66,31 @@ class TelegramClient:
             params["reply_to_message_id"] = reply_to_message_id
         if entities is not None:
             params["entities"] = entities
-        return self._call("sendMessage", params)  # type: ignore[return-value]
+        if parse_mode is not None:
+            params["parse_mode"] = parse_mode
+        return await self._post("sendMessage", params)  # type: ignore[return-value]
 
-    def edit_message_text(
+    async def edit_message_text(
         self,
         chat_id: int,
         message_id: int,
         text: str,
         entities: list[dict] | None = None,
+        parse_mode: str | None = None,
     ) -> dict:
-        params: dict = {
+        params: dict[str, Any] = {
             "chat_id": chat_id,
             "message_id": message_id,
             "text": text,
         }
         if entities is not None:
             params["entities"] = entities
-        return self._call("editMessageText", params)  # type: ignore[return-value]
+        if parse_mode is not None:
+            params["parse_mode"] = parse_mode
+        return await self._post("editMessageText", params)  # type: ignore[return-value]
 
-    def delete_message(self, chat_id: int, message_id: int) -> bool:
-        res = self._call(
+    async def delete_message(self, chat_id: int, message_id: int) -> bool:
+        res = await self._post(
             "deleteMessage",
             {
                 "chat_id": chat_id,
@@ -84,4 +98,3 @@ class TelegramClient:
             },
         )
         return bool(res)
-

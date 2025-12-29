@@ -5,9 +5,8 @@ description = "Telegram bridge tools for Codex."
 readme = "readme.md"
 requires-python = ">=3.12"
 dependencies = [
+  "httpx>=0.28.1",
   "markdown-it-py",
-  "requests",
-  "sulguk",
   "typer",
 ]
 
