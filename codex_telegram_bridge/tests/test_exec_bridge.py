@@ -111,7 +111,6 @@ def test_final_notify_sends_loud_final_message() -> None:
     asyncio.run(
         _handle_message(
             cfg,
-            semaphore=asyncio.Semaphore(1),
             chat_id=123,
             user_msg_id=10,
             text="hi",
@@ -141,7 +140,6 @@ def test_new_final_message_forces_notification_when_too_long_to_edit() -> None:
     asyncio.run(
         _handle_message(
             cfg,
-            semaphore=asyncio.Semaphore(1),
             chat_id=123,
             user_msg_id=10,
             text="hi",
