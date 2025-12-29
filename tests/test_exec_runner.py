@@ -4,7 +4,7 @@ from takopi.exec_bridge import CodexExecRunner
 
 
 def test_run_serialized_serializes_same_session() -> None:
-    runner = CodexExecRunner(codex_cmd="codex", workspace=None, extra_args=[])
+    runner = CodexExecRunner(codex_cmd="codex", extra_args=[])
     gate = asyncio.Event()
     in_flight = 0
     max_in_flight = 0

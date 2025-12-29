@@ -194,11 +194,9 @@ class CodexExecRunner:
     def __init__(
         self,
         codex_cmd: str,
-        workspace: str | None,
         extra_args: list[str],
     ) -> None:
         self.codex_cmd = codex_cmd
-        self.workspace = workspace
         self.extra_args = extra_args
 
         # Per-session locks to prevent concurrent resumes to the same session_id.
@@ -219,14 +217,10 @@ class CodexExecRunner:
         session_id: str | None,
         on_event: EventCallback | None = None,
     ) -> tuple[str, str, bool]:
-        logger.info(
-            "[codex] start run session_id=%r workspace=%r", session_id, self.workspace
-        )
+        logger.info("[codex] start run session_id=%r", session_id)
         logger.debug("[codex] prompt: %s", prompt)
         args = [self.codex_cmd]
         args.extend(self.extra_args)
-        if self.workspace:
-            args.extend(["--cd", self.workspace])
         args.extend(["exec", "--json"])
 
         # Always pipe prompt via stdin ("-") to avoid quoting issues.
@@ -355,19 +349,11 @@ class BridgeConfig:
 def _parse_bridge_config(
     *,
     final_notify: bool,
-    cd: str | None,
     profile: str | None,
 ) -> BridgeConfig:
     startup_pwd = os.getcwd()
-    workspace = None
-    if cd is not None:
-        expanded_cd = os.path.expanduser(cd)
-        if not os.path.isdir(expanded_cd):
-            raise ConfigError(f"--cd must be an existing directory: {expanded_cd}")
-        workspace = expanded_cd
-        startup_pwd = expanded_cd
 
-    config, config_path = load_telegram_config(base_dir=workspace)
+    config, config_path = load_telegram_config()
     try:
         token = config["bot_token"]
     except KeyError:
@@ -396,7 +382,7 @@ def _parse_bridge_config(
         extra_args.extend(["--profile", profile])
 
     bot = TelegramClient(token)
-    runner = CodexExecRunner(codex_cmd=codex_cmd, workspace=workspace, extra_args=extra_args)
+    runner = CodexExecRunner(codex_cmd=codex_cmd, extra_args=extra_args)
 
     return BridgeConfig(
         bot=bot,
@@ -691,11 +677,6 @@ def run(
         "--debug/--no-debug",
         help="Log codex JSONL, Telegram requests, and rendered messages.",
     ),
-    cd: str | None = typer.Option(
-        None,
-        "--cd",
-        help="Pass through to `codex --cd`.",
-    ),
     profile: str | None = typer.Option(
         None,
         "--profile",
@@ -706,7 +687,6 @@ def run(
     try:
         cfg = _parse_bridge_config(
             final_notify=final_notify,
-            cd=cd,
             profile=profile,
         )
     except ConfigError as e:

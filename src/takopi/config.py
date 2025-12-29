@@ -46,16 +46,10 @@ def _missing_config_message(primary: Path, alternate: Path | None = None) -> str
     )
 
 
-def _config_candidates(base_dir: Path | None) -> list[Path]:
-    candidates: list[Path] = []
-    if base_dir is not None:
-        candidates.append(base_dir / LOCAL_CONFIG_NAME)
-
-    cwd = Path.cwd()
-    if base_dir is None or base_dir != cwd:
-        candidates.append(cwd / LOCAL_CONFIG_NAME)
-
-    candidates.append(HOME_CONFIG_PATH)
+def _config_candidates() -> list[Path]:
+    candidates = [Path.cwd() / LOCAL_CONFIG_NAME, HOME_CONFIG_PATH]
+    if candidates[0] == candidates[1]:
+        return [candidates[0]]
     return candidates
 
 
@@ -72,17 +66,16 @@ def _read_config(cfg_path: Path) -> dict:
         raise ConfigError(f"Malformed TOML in {cfg_path}: {e}") from None
 
 
-def load_telegram_config(
-    path: str | Path | None = None, *, base_dir: str | Path | None = None
-) -> tuple[dict, Path]:
+def load_telegram_config(path: str | Path | None = None) -> tuple[dict, Path]:
     if path:
         cfg_path = Path(path).expanduser()
         return _read_config(cfg_path), cfg_path
 
-    base = Path(base_dir).expanduser() if base_dir is not None else None
-    candidates = _config_candidates(base)
+    candidates = _config_candidates()
     for candidate in candidates:
         if candidate.is_file():
             return _read_config(candidate), candidate
 
+    if len(candidates) == 1:
+        raise ConfigError(_missing_config_message(candidates[0]))
     raise ConfigError(_missing_config_message(HOME_CONFIG_PATH, candidates[0]))

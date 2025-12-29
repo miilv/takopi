@@ -73,15 +73,15 @@ def render_markdown(md: str) -> tuple[str, list[dict[str, Any]]]:
 ### `config.py` — Configuration Loading
 
 ```python
-def load_telegram_config(path=None, *, base_dir=None) -> tuple[dict, Path]:
-    # Loads <base_dir>/codex/takopi.toml (if set), then ./codex/takopi.toml, then ~/.codex/takopi.toml
+def load_telegram_config(path=None) -> tuple[dict, Path]:
+    # Loads ./.codex/takopi.toml, then ~/.codex/takopi.toml
 ```
 
 ### `constants.py` — Shared Constants
 
 ```python
 TELEGRAM_HARD_LIMIT = 4096  # Max message length
-LOCAL_CONFIG_NAME = codex/takopi.toml
+LOCAL_CONFIG_NAME = .codex/takopi.toml
 HOME_CONFIG_PATH = ~/.codex/takopi.toml
 ```
 
