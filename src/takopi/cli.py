@@ -11,14 +11,21 @@ import typer
 
 from . import __version__
 from .backends import EngineBackend
-from .bridge import BridgeConfig, run_main_loop
-from .config import ConfigError, load_telegram_config
+from .config import ConfigError
 from .engines import get_backend, get_engine_config, list_backends
 from .lockfile import LockError, LockHandle, acquire_lock, token_fingerprint
 from .logging import get_logger, setup_logging
-from .onboarding import SetupResult, check_setup, interactive_setup
+from .telegram.bridge import (
+    TelegramBridgeConfig,
+    TelegramPresenter,
+    TelegramTransport,
+    run_main_loop,
+)
+from .telegram.client import TelegramClient
+from .telegram.config import load_telegram_config
+from .telegram.onboarding import SetupResult, check_setup, interactive_setup
 from .router import AutoRouter, RunnerEntry
-from .telegram import TelegramClient
+from .runner_bridge import ExecBridgeConfig
 
 logger = get_logger(__name__)
 
@@ -184,7 +191,7 @@ def _parse_bridge_config(
     config_path: Path,
     token: str,
     chat_id: int,
-) -> BridgeConfig:
+) -> TelegramBridgeConfig:
     startup_pwd = os.getcwd()
 
     backends = list_backends()
@@ -213,13 +220,20 @@ def _parse_bridge_config(
     )
 
     bot = TelegramClient(token)
+    transport = TelegramTransport(bot)
+    presenter = TelegramPresenter()
+    exec_cfg = ExecBridgeConfig(
+        transport=transport,
+        presenter=presenter,
+        final_notify=final_notify,
+    )
 
-    return BridgeConfig(
+    return TelegramBridgeConfig(
         bot=bot,
         router=router,
         chat_id=chat_id,
-        final_notify=final_notify,
         startup_msg=startup_msg,
+        exec_cfg=exec_cfg,
     )
 
 
