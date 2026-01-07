@@ -1,24 +1,28 @@
 # changelog
 
-## v0.9.0 (unreleased)
+## v0.9.0 (2026-01-07)
 
-### breaking
+### projects and worktrees
 
-- remove `takopi.bridge`; Telegram bridge now lives in `takopi.bridges.telegram`
+- register repos with `takopi init <alias>` and target them via `/project` directives
+- route runs to git worktrees with `@branch` — takopi resolves or creates worktrees automatically
+- replies preserve context via `ctx: project @ branch` footers, no need to repeat directives
+- set `default_project` to skip the `/project` prefix entirely
+- per-project `default_engine` and `worktree_base` configuration
 
 ### changes
 
-- add transport/presenter protocols plus transport-agnostic `exec_bridge`
-- move Telegram polling + wiring into `takopi.bridges.telegram` with transport/presenter adapters
-- add project configuration, directive parsing (`/project`, `@branch`), and `ctx:`-aware routing for runs
-- add `takopi init` to register project aliases from the main checkout (with worktree defaults)
-- resolve git worktrees on demand and run engine subprocesses in the project/worktree cwd
+- transport/presenter protocols plus transport-agnostic `exec_bridge`
+- move Telegram polling + wiring into `takopi.telegram` with transport/presenter adapters
 - list configured projects in the startup banner
-- add a shared incoming message shape plus Telegram parsing helpers
 
 ### fixes
 
 - render `ctx:` footer lines consistently (backticked + hard breaks) and include them in final messages
+
+### breaking
+
+- remove `takopi.bridge`; use `takopi.runner_bridge` and `takopi.telegram` instead
 
 ### docs
 
