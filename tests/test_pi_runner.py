@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import anyio
 import pytest
@@ -48,6 +49,7 @@ def test_translate_success_fixture() -> None:
 
     assert isinstance(events[0], StartedEvent)
     started = next(evt for evt in events if isinstance(evt, StartedEvent))
+    assert started.meta is None
 
     action_events = [evt for evt in events if isinstance(evt, ActionEvent)]
     assert len(action_events) == 4
@@ -128,3 +130,25 @@ async def test_run_serializes_same_session() -> None:
         await anyio.sleep(0)
         gate.set()
     assert max_in_flight == 1
+
+
+def test_session_path_prefers_run_base_dir(tmp_path: Path) -> None:
+    runner = PiRunner(
+        extra_args=[],
+        model=None,
+        provider=None,
+    )
+    project_cwd = Path("/project")
+    session_root = tmp_path / "sessions"
+
+    with (
+        patch("takopi.runners.pi.get_run_base_dir", return_value=project_cwd),
+        patch(
+            "takopi.runners.pi._default_session_dir",
+            return_value=session_root,
+        ) as default_session_dir,
+    ):
+        session_path = runner._new_session_path()
+
+    default_session_dir.assert_called_once_with(project_cwd)
+    assert str(session_root) in session_path
