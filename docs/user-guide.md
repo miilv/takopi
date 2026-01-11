@@ -474,7 +474,15 @@ worktree_base = "develop"
 
 ---
 
-## 11. Troubleshooting
+## 12. Tips
+
+### Schedule tasks with Telegram
+
+Telegram has a native message scheduling feature that works seamlessly with takopi. Long-press the send button and choose "Schedule Message" to run tasks at a specific time. You can also set up recurring schedules (daily, weekly, etc.) for automated workflows.
+
+---
+
+## 13. Troubleshooting
 
 If something isn't working, rerun with `takopi --debug` and check `debug.log`
 for errors. Include it when reporting issues.
