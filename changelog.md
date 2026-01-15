@@ -1,5 +1,24 @@
 # changelog
 
+## v0.20.0 (2026-01-15)
+
+### changes
+
+- add telegram mentions-only trigger mode [#142](https://github.com/banteg/takopi/pull/142)
+- add telegram /model and /reasoning overrides [#147](https://github.com/banteg/takopi/pull/147)
+- coalesce forwarded telegram messages [#146](https://github.com/banteg/takopi/pull/146)
+- export plugin utilities for transport development [#137](https://github.com/banteg/takopi/pull/137)
+
+### fixes
+
+- handle forwarded uploads for telegram [#149](https://github.com/banteg/takopi/pull/149)
+- preserve directives for voice transcripts [#141](https://github.com/banteg/takopi/pull/141)
+- resolve claude.cmd via shutil.which on windows [#124](https://github.com/banteg/takopi/pull/124)
+
+### docs
+
+- add takopi-scripts plugin to plugins list [#140](https://github.com/banteg/takopi/pull/140)
+
 ## v0.19.0 (2026-01-15)
 
 ### changes
