@@ -1,5 +1,11 @@
 # changelog
 
+## v0.21.3 (2026-01-21)
+
+### fixes
+
+- ignore implicit topic root replies in telegram [#175](https://github.com/banteg/takopi/pull/175)
+
 ## v0.21.2 (2026-01-20)
 
 ### fixes
