@@ -1,5 +1,11 @@
 # changelog
 
+## v0.22.1 (2026-02-10)
+
+### fixes
+
+- preserve ordered list numbering when nested list indentation is malformed in telegram render output [#202](https://github.com/banteg/takopi/pull/202)
+
 ## v0.22.0 (2026-02-10)
 
 ### changes
