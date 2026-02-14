@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import io
 from collections.abc import Awaitable, Callable
 from typing import Protocol
+
+import httpx
 
 from ..logging import get_logger
 from openai import AsyncOpenAI, OpenAIError
@@ -12,7 +15,7 @@ from .types import TelegramIncomingMessage
 
 logger = get_logger(__name__)
 
-__all__ = ["transcribe_voice"]
+__all__ = ["transcribe_voice", "SpeechCoreTranscriber"]
 
 VOICE_TRANSCRIPTION_DISABLED_HINT = (
     "voice transcription is disabled. enable it in config:\n"
@@ -50,6 +53,85 @@ class OpenAIVoiceTranscriber:
                 file=audio_file,
             )
         return response.text
+
+
+class SpeechCoreTranscriber:
+    """Voice transcriber using SpeechCore AI API (speechcoreai.com)."""
+
+    BASE_URL = "https://speechcoreai.com/api"
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        language: str = "auto",
+        diarize: bool = False,
+    ) -> None:
+        self._api_key = api_key
+        self._language = language
+        self._diarize = diarize
+
+    async def transcribe(self, *, model: str, audio_bytes: bytes) -> str:
+        headers = {"Authorization": f"Bearer {self._api_key}"}
+        # Always use large-v3 for SpeechCore (ignore OpenAI model name)
+        params = {
+            "model": "large-v3",
+            "language": self._language,
+            "diarize": str(self._diarize).lower(),
+        }
+
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            # 1. Upload audio file
+            files = {"file": ("voice.ogg", io.BytesIO(audio_bytes), "audio/ogg")}
+            upload_resp = await client.post(
+                f"{self.BASE_URL}/upload",
+                headers=headers,
+                params=params,
+                files=files,
+            )
+            upload_resp.raise_for_status()
+            task_id = upload_resp.json()["task_id"]
+            logger.info("speechcore.upload.success", task_id=task_id)
+
+            # 2. Poll for completion
+            max_polls = 120  # 10 minutes max
+            for _ in range(max_polls):
+                status_resp = await client.get(
+                    f"{self.BASE_URL}/transcriptions/{task_id}/status",
+                    headers=headers,
+                )
+                status_resp.raise_for_status()
+                status_data = status_resp.json()
+                status = status_data.get("status")
+
+                if status == "completed":
+                    break
+                elif status == "failed":
+                    error = status_data.get("error", "Unknown error")
+                    raise RuntimeError(f"SpeechCore transcription failed: {error}")
+
+                await asyncio.sleep(5)
+            else:
+                raise RuntimeError("SpeechCore transcription timed out")
+
+            # 3. Get transcription result
+            result_resp = await client.get(
+                f"{self.BASE_URL}/transcriptions/{task_id}",
+                headers=headers,
+            )
+            result_resp.raise_for_status()
+            result = result_resp.json()
+
+            # Extract text from result
+            text = result.get("text", "")
+            if not text and "segments" in result:
+                # Fallback: join segment texts
+                text = " ".join(
+                    seg.get("text", "") for seg in result.get("segments", [])
+                )
+
+            logger.info("speechcore.transcribe.success", task_id=task_id)
+            return text.strip()
 
 
 async def transcribe_voice(

@@ -50,6 +50,13 @@ from .commands.handlers import (
 )
 from .commands.parse import is_cancel_command
 from .commands.reply import make_reply
+from .commands.sessions import (
+    handle_sessions_command,
+    handle_switch_command,
+    handle_name_command,
+    handle_delete_command,
+    handle_switch_callback,
+)
 from .context import _merge_topic_context, _usage_ctx_set, _usage_topic
 from .topics import (
     _maybe_rename_topic,
@@ -71,7 +78,7 @@ from .types import (
     TelegramIncomingMessage,
     TelegramIncomingUpdate,
 )
-from .voice import transcribe_voice
+from .voice import transcribe_voice, SpeechCoreTranscriber
 
 logger = get_logger(__name__)
 
@@ -289,6 +296,61 @@ def _dispatch_builtin_command(
         task_group.start_soon(handler)
         return True
 
+    # Session management commands
+    if command_id == "sessions":
+        if ctx.chat_session_store is not None:
+            handler = partial(
+                handle_sessions_command,
+                cfg,
+                msg,
+                args_text,
+                ctx.chat_session_store,
+                ctx.chat_session_key,
+                ctx.default_engine,
+            )
+            task_group.start_soon(handler)
+            return True
+
+    if command_id == "switch":
+        if ctx.chat_session_store is not None:
+            handler = partial(
+                handle_switch_command,
+                cfg,
+                msg,
+                args_text,
+                ctx.chat_session_store,
+                ctx.chat_session_key,
+            )
+            task_group.start_soon(handler)
+            return True
+
+    if command_id == "name":
+        if ctx.chat_session_store is not None:
+            handler = partial(
+                handle_name_command,
+                cfg,
+                msg,
+                args_text,
+                ctx.chat_session_store,
+                ctx.chat_session_key,
+                ctx.default_engine,
+            )
+            task_group.start_soon(handler)
+            return True
+
+    if command_id == "delete":
+        if ctx.chat_session_store is not None:
+            handler = partial(
+                handle_delete_command,
+                cfg,
+                msg,
+                args_text,
+                ctx.chat_session_store,
+                ctx.chat_session_key,
+            )
+            task_group.start_soon(handler)
+            return True
+
     return False
 
 
@@ -382,10 +444,13 @@ class TelegramCommandContext:
     ambient_context: RunContext | None
     topic_store: TopicStateStore | None
     chat_prefs: ChatPrefsStore | None
+    chat_session_store: ChatSessionStore | None
+    chat_session_key: tuple[int, int | None] | None
     resolved_scope: str | None
     scope_chat_ids: frozenset[int]
     reply: Callable[..., Awaitable[None]]
     task_group: TaskGroup
+    default_engine: str
 
 
 def _classify_message(
@@ -1111,6 +1176,7 @@ async def run_main_loop(
                 base_cb: Callable[[ResumeToken, anyio.Event], Awaitable[None]] | None,
                 topic_key: tuple[int, int] | None,
                 chat_session_key: tuple[int, int | None] | None,
+                first_message: str | None = None,
             ) -> Callable[[ResumeToken, anyio.Event], Awaitable[None]] | None:
                 if base_cb is None and topic_key is None and chat_session_key is None:
                     return None
@@ -1127,7 +1193,10 @@ async def run_main_loop(
                         and chat_session_key is not None
                     ):
                         await state.chat_session_store.set_session_resume(
-                            chat_session_key[0], chat_session_key[1], token
+                            chat_session_key[0],
+                            chat_session_key[1],
+                            token,
+                            first_message=first_message,
                         )
 
                 return _wrapped
@@ -1190,7 +1259,7 @@ async def run_main_loop(
                     context=context,
                     reply_ref=reply_ref,
                     on_thread_known=wrap_on_thread_known(
-                        on_thread_known, topic_key, chat_session_key
+                        on_thread_known, topic_key, chat_session_key, text
                     ),
                     engine_override=engine_override,
                     thread_id=thread_id,
@@ -1646,10 +1715,13 @@ async def run_main_loop(
                         ambient_context=ambient_context,
                         topic_store=state.topic_store,
                         chat_prefs=state.chat_prefs,
+                        chat_session_store=state.chat_session_store,
+                        chat_session_key=chat_session_key,
                         resolved_scope=state.resolved_topics_scope,
                         scope_chat_ids=state.topics_chat_ids,
                         reply=reply,
                         task_group=tg,
+                        default_engine=cfg.runtime.default_engine,
                     ),
                     command_id=command_id,
                 ):
@@ -1671,6 +1743,15 @@ async def run_main_loop(
                     return
 
                 if msg.voice is not None:
+                    # Select transcriber based on provider
+                    transcriber = None
+                    if cfg.voice_transcription_provider == "speechcore":
+                        if cfg.voice_speechcore_api_key:
+                            transcriber = SpeechCoreTranscriber(
+                                api_key=cfg.voice_speechcore_api_key,
+                                language=cfg.voice_speechcore_language,
+                                diarize=cfg.voice_speechcore_diarize,
+                            )
                     text = await transcribe_voice(
                         bot=cfg.bot,
                         msg=msg,
@@ -1678,6 +1759,7 @@ async def run_main_loop(
                         model=cfg.voice_transcription_model,
                         max_bytes=cfg.voice_max_bytes,
                         reply=reply,
+                        transcriber=transcriber,
                         base_url=cfg.voice_transcription_base_url,
                         api_key=cfg.voice_transcription_api_key,
                     )
@@ -1751,6 +1833,7 @@ async def run_main_loop(
                                 scheduler.note_thread_known,
                                 topic_key,
                                 chat_session_key,
+                                text,
                             ),
                             stateful_mode,
                             default_engine_override,
@@ -1839,6 +1922,36 @@ async def run_main_loop(
                             state.running_tasks,
                             scheduler,
                         )
+                    elif update.data and update.data.startswith("takopi:switch:"):
+                        # Handle session switch callback
+                        resume_prefix = update.data[14:]  # len("takopi:switch:")
+                        chat_type = (
+                            update.raw.get("message", {}).get("chat", {}).get("type")
+                            if update.raw
+                            else None
+                        )
+                        if state.chat_session_store is None:
+                            chat_session_key = None
+                        elif chat_type == "private":
+                            chat_session_key = (update.chat_id, None)
+                        elif update.sender_id is not None:
+                            chat_session_key = (update.chat_id, update.sender_id)
+                        else:
+                            chat_session_key = None
+
+                        async def handle_switch():
+                            result = await handle_switch_callback(
+                                cfg,
+                                state.chat_session_store,
+                                chat_session_key,
+                                resume_prefix,
+                            )
+                            await cfg.bot.answer_callback_query(
+                                update.callback_query_id,
+                                text=result,
+                            )
+
+                        tg.start_soon(handle_switch)
                     else:
                         tg.start_soon(
                             cfg.bot.answer_callback_query,

@@ -72,6 +72,10 @@ def build_bot_commands(
         seen.add(cmd)
     for cmd, description in [
         ("new", "start a new thread"),
+        ("sessions", "list and switch sessions"),
+        ("switch", "switch to another session"),
+        ("name", "name current session"),
+        ("delete", "delete a session"),
         ("ctx", "show or update context"),
         ("agent", "set default engine"),
         ("model", "set model override"),

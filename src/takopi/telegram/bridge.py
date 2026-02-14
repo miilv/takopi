@@ -123,9 +123,13 @@ class TelegramBridgeConfig:
     show_resume_line: bool = True
     voice_transcription: bool = False
     voice_max_bytes: int = 10 * 1024 * 1024
+    voice_transcription_provider: Literal["openai", "speechcore"] = "openai"
     voice_transcription_model: str = "gpt-4o-mini-transcribe"
     voice_transcription_base_url: str | None = None
     voice_transcription_api_key: str | None = None
+    voice_speechcore_api_key: str | None = None
+    voice_speechcore_language: str = "auto"
+    voice_speechcore_diarize: bool = False
     forward_coalesce_s: float = 1.0
     media_group_debounce_s: float = 1.0
     allowed_user_ids: tuple[int, ...] = ()
@@ -306,12 +310,16 @@ async def send_plain(
     text: str,
     notify: bool = True,
     thread_id: int | None = None,
+    reply_markup: dict | None = None,
 ) -> None:
     reply_to = MessageRef(channel_id=chat_id, message_id=user_msg_id)
     rendered_text, entities = prepare_telegram(MarkdownParts(header=text))
+    extra: dict = {"entities": entities}
+    if reply_markup is not None:
+        extra["reply_markup"] = reply_markup
     await transport.send(
         channel_id=chat_id,
-        message=RenderedMessage(text=rendered_text, extra={"entities": entities}),
+        message=RenderedMessage(text=rendered_text, extra=extra),
         options=SendOptions(reply_to=reply_to, notify=notify, thread_id=thread_id),
     )
 

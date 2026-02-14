@@ -254,11 +254,12 @@ async def _handle_chat_new_command(
     if session_key is None:
         await reply(text="no stored sessions to clear for this chat.")
         return
+    # Use clear_sessions to start fresh (clears active pointers, keeps history)
     await store.clear_sessions(session_key[0], session_key[1])
     if msg.chat_type == "private":
-        text = "cleared stored sessions for this chat."
+        text = "new session started. previous sessions saved in `/sessions`."
     else:
-        text = "cleared stored sessions for you in this chat."
+        text = "new session started for you. previous sessions saved in `/sessions`."
     await reply(text=text)
 
 

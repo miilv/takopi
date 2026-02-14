@@ -98,9 +98,13 @@ class TelegramTransportSettings(BaseModel):
     message_overflow: Literal["trim", "split"] = "trim"
     voice_transcription: bool = False
     voice_max_bytes: StrictInt = 10 * 1024 * 1024
+    voice_transcription_provider: Literal["openai", "speechcore"] = "openai"
     voice_transcription_model: NonEmptyStr = "gpt-4o-mini-transcribe"
     voice_transcription_base_url: NonEmptyStr | None = None
     voice_transcription_api_key: NonEmptyStr | None = None
+    voice_speechcore_api_key: NonEmptyStr | None = None
+    voice_speechcore_language: NonEmptyStr = "auto"
+    voice_speechcore_diarize: bool = False
     session_mode: Literal["stateless", "chat"] = "stateless"
     show_resume_line: bool = True
     forward_coalesce_s: float = Field(default=1.0, ge=0)

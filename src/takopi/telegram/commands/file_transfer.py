@@ -497,51 +497,68 @@ async def _handle_file_get(
     reply = make_reply(cfg, msg)
     if not await _check_file_permissions(cfg, msg):
         return
-    try:
-        resolved = cfg.runtime.resolve_message(
-            text=args_text,
-            reply_text=msg.reply_to_text,
-            ambient_context=ambient_context,
-            chat_id=msg.chat_id,
-        )
-    except DirectiveError as exc:
-        await reply(text=f"error:\n{exc}")
-        return
-    topic_key = _topic_key(msg, cfg) if topic_store is not None else None
-    await _maybe_update_topic_context(
-        cfg=cfg,
-        topic_store=topic_store,
-        topic_key=topic_key,
-        context=resolved.context,
-        context_source=resolved.context_source,
-    )
-    if resolved.context is None or resolved.context.project is None:
-        await reply(text="no project context available for file download.")
-        return
-    try:
-        run_root = cfg.runtime.resolve_run_cwd(resolved.context)
-    except ConfigError as exc:
-        await reply(text=f"error:\n{exc}")
-        return
-    if run_root is None:
-        await reply(text="no project context available for file download.")
-        return
-    path_value = resolved.prompt
-    if not path_value.strip():
+
+    path_value = args_text.strip()
+    if not path_value:
         await reply(text=FILE_GET_USAGE)
         return
-    rel_path = normalize_relative_path(path_value)
-    if rel_path is None:
-        await reply(text="invalid download path.")
-        return
-    deny_rule = deny_reason(rel_path, cfg.files.deny_globs)
-    if deny_rule is not None:
-        await reply(text=f"path denied by rule: {deny_rule}")
-        return
-    target = resolve_path_within_root(run_root, rel_path)
-    if target is None:
-        await reply(text="download path escapes the repo root.")
-        return
+
+    # Support absolute paths directly
+    if path_value.startswith("/"):
+        target = Path(path_value)
+        rel_path = Path(target.name)
+        deny_rule = deny_reason(rel_path, cfg.files.deny_globs)
+        if deny_rule is not None:
+            await reply(text=f"path denied by rule: {deny_rule}")
+            return
+    else:
+        # Try to resolve via project context
+        try:
+            resolved = cfg.runtime.resolve_message(
+                text=args_text,
+                reply_text=msg.reply_to_text,
+                ambient_context=ambient_context,
+                chat_id=msg.chat_id,
+            )
+        except DirectiveError as exc:
+            await reply(text=f"error:\n{exc}")
+            return
+        topic_key = _topic_key(msg, cfg) if topic_store is not None else None
+        await _maybe_update_topic_context(
+            cfg=cfg,
+            topic_store=topic_store,
+            topic_key=topic_key,
+            context=resolved.context,
+            context_source=resolved.context_source,
+        )
+
+        run_root: Path | None = None
+        if resolved.context is not None and resolved.context.project is not None:
+            try:
+                run_root = cfg.runtime.resolve_run_cwd(resolved.context)
+            except ConfigError:
+                pass
+
+        # Fall back to home directory if no project context
+        if run_root is None:
+            run_root = Path.home()
+
+        path_value = resolved.prompt
+        if not path_value.strip():
+            await reply(text=FILE_GET_USAGE)
+            return
+        rel_path = normalize_relative_path(path_value)
+        if rel_path is None:
+            await reply(text="invalid download path.")
+            return
+        deny_rule = deny_reason(rel_path, cfg.files.deny_globs)
+        if deny_rule is not None:
+            await reply(text=f"path denied by rule: {deny_rule}")
+            return
+        target = resolve_path_within_root(run_root, rel_path)
+        if target is None:
+            await reply(text="download path escapes allowed directory.")
+            return
     if not target.exists():
         await reply(text="file does not exist.")
         return
