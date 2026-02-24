@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Annotated, Any, ClassVar, Literal
 from collections.abc import Iterable
@@ -109,6 +110,7 @@ class TelegramTransportSettings(BaseModel):
     show_resume_line: bool = True
     forward_coalesce_s: float = Field(default=1.0, ge=0)
     media_group_debounce_s: float = Field(default=1.0, ge=0)
+    inject_dir: NonEmptyStr | None = None
     topics: TelegramTopicsSettings = Field(default_factory=TelegramTopicsSettings)
     files: TelegramFilesSettings = Field(default_factory=TelegramFilesSettings)
 
@@ -331,7 +333,12 @@ def require_telegram(settings: TakopiSettings, config_path: Path) -> tuple[str, 
 
 
 def _resolve_config_path(path: str | Path | None) -> Path:
-    return Path(path).expanduser() if path else HOME_CONFIG_PATH
+    if path:
+        return Path(path).expanduser()
+    env_path = os.environ.get("TAKOPI_CONFIG")
+    if env_path:
+        return Path(env_path).expanduser()
+    return HOME_CONFIG_PATH
 
 
 def _ensure_config_file(cfg_path: Path) -> None:

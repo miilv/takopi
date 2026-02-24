@@ -1285,6 +1285,50 @@ async def run_main_loop(
 
             scheduler = ThreadScheduler(task_group=tg, run_job=run_thread_job)
 
+            if cfg.inject_dir is not None:
+                from .inject import watch_inject_dir
+
+                async def _get_inject_resume(chat_id: int) -> ResumeToken | None:
+                    if state.chat_session_store is None:
+                        return None
+                    return await state.chat_session_store.get_session_resume(
+                        chat_id, None, cfg.runtime.default_engine
+                    )
+
+                async def _clear_inject_session(chat_id: int) -> None:
+                    if state.chat_session_store is not None:
+                        await state.chat_session_store.clear_sessions(chat_id, None)
+
+                async def _inject_run_job(
+                    chat_id: int,
+                    user_msg_id: int,
+                    text: str,
+                    resume_token: ResumeToken | None,
+                    context: RunContext | None,
+                ) -> None:
+                    chat_session_key = (
+                        (chat_id, None) if state.chat_session_store is not None else None
+                    )
+                    await run_job(
+                        chat_id,
+                        user_msg_id,
+                        text,
+                        resume_token,
+                        context,
+                        chat_session_key=chat_session_key,
+                    )
+
+                async def run_inject_watcher() -> None:
+                    await watch_inject_dir(
+                        inject_dir=cfg.inject_dir,
+                        chat_id=cfg.chat_id,
+                        run_job=_inject_run_job,
+                        get_resume=_get_inject_resume,
+                        clear_session=_clear_inject_session,
+                    )
+
+                tg.start_soon(run_inject_watcher)
+
             def resolve_topic_key(
                 msg: TelegramIncomingMessage,
             ) -> tuple[int, int] | None:

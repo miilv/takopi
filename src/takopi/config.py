@@ -50,7 +50,11 @@ def read_config(cfg_path: Path) -> dict:
 
 
 def load_or_init_config(path: str | Path | None = None) -> tuple[dict, Path]:
-    cfg_path = Path(path).expanduser() if path else HOME_CONFIG_PATH
+    if path:
+        cfg_path = Path(path).expanduser()
+    else:
+        env_path = os.environ.get("TAKOPI_CONFIG")
+        cfg_path = Path(env_path).expanduser() if env_path else HOME_CONFIG_PATH
     if cfg_path.exists() and not cfg_path.is_file():
         raise ConfigError(f"Config path {cfg_path} exists but is not a file.") from None
     if not cfg_path.exists():

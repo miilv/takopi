@@ -288,6 +288,7 @@ class ClaudeRunner(ResumeTokenMixin, JsonlSubprocessRunner):
     allowed_tools: list[str] | None = None
     dangerously_skip_permissions: bool = False
     use_api_billing: bool = False
+    append_system_prompt: str | None = None
     session_title: str = "claude"
     logger = logger
 
@@ -311,6 +312,8 @@ class ClaudeRunner(ResumeTokenMixin, JsonlSubprocessRunner):
             args.extend(["--allowedTools", allowed_tools])
         if self.dangerously_skip_permissions is True:
             args.append("--dangerously-skip-permissions")
+        if self.append_system_prompt is not None:
+            args.extend(["--append-system-prompt", self.append_system_prompt])
         args.append("--")
         args.append(prompt)
         return args
@@ -464,6 +467,7 @@ def build_runner(config: EngineConfig, _config_path: Path) -> Runner:
         allowed_tools = DEFAULT_ALLOWED_TOOLS
     dangerously_skip_permissions = config.get("dangerously_skip_permissions") is True
     use_api_billing = config.get("use_api_billing") is True
+    append_system_prompt = config.get("append_system_prompt")
     title = str(model) if model is not None else "claude"
 
     return ClaudeRunner(
@@ -472,6 +476,7 @@ def build_runner(config: EngineConfig, _config_path: Path) -> Runner:
         allowed_tools=allowed_tools,
         dangerously_skip_permissions=dangerously_skip_permissions,
         use_api_billing=use_api_billing,
+        append_system_prompt=append_system_prompt,
         session_title=title,
     )
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal, cast
 
 from ..logging import get_logger
@@ -135,6 +136,7 @@ class TelegramBridgeConfig:
     allowed_user_ids: tuple[int, ...] = ()
     files: TelegramFilesSettings = field(default_factory=TelegramFilesSettings)
     chat_ids: tuple[int, ...] | None = None
+    inject_dir: Path | None = None
     topics: TelegramTopicsSettings = field(default_factory=TelegramTopicsSettings)
 
 

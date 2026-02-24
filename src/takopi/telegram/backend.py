@@ -127,6 +127,14 @@ class TelegramBackend(TransportBackend):
             presenter=presenter,
             final_notify=final_notify,
         )
+        inject_dir: Path | None = None
+        if settings.inject_dir is not None:
+            inject_path = Path(settings.inject_dir)
+            if not inject_path.is_absolute():
+                inject_path = config_path.parent / inject_path
+            inject_path.mkdir(parents=True, exist_ok=True)
+            inject_dir = inject_path
+
         cfg = TelegramBridgeConfig(
             bot=bot,
             runtime=runtime,
@@ -147,6 +155,7 @@ class TelegramBackend(TransportBackend):
             forward_coalesce_s=settings.forward_coalesce_s,
             media_group_debounce_s=settings.media_group_debounce_s,
             allowed_user_ids=tuple(settings.allowed_user_ids),
+            inject_dir=inject_dir,
             topics=settings.topics,
             files=settings.files,
         )
